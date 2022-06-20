@@ -374,7 +374,10 @@ contract AutomatedAdmin {
 		address _contract,
 		bytes4 functionSig
 	) external view returns (bool) {
-		return permissions[_contract][functionSig] & roles[user] != 0;
+		bytes1 _roles = roles[user];
+		if (_roles & 0x01 != 0)
+			return true;
+		return permissions[_contract][functionSig] & _roles != 0;
 	}
 
 	/// @notice Given a queued transaction's hash, retrieve all its info
