@@ -20,7 +20,7 @@ contract AutomatedAdmin {
 	}
 
 	struct Slot0 {
-		// Indicates whether [contractCall] is available to non-[Admin]s
+		// Indicates whether [contractCall] is locked
 		bool locked;
 		// A bitmap indicating which roles are enabled versus disabled
 		bytes1 roleMap;
@@ -173,8 +173,7 @@ contract AutomatedAdmin {
 		roles[msg.sender] = ADMIN;
 	}
 
-	/// @notice Locks the contractCall() function, such that it can only be called
-	/// by the [Admin] role
+	/// @notice Locks the contractCall() function, such that it cannot be called
 	function lock() external canCall(ADMIN_SAFETY_AND_AUTOMATION) {
 		slot0.locked = true;
 		emit LockToggle(msg.sender, true);
@@ -391,7 +390,7 @@ contract AutomatedAdmin {
 	/// @dev Meant to be called off-chain
 	/// @return string A list of roles
 	function getRolesList() external view returns (string memory) {
-		return string.concat("\n> Roles available are: ", roleBitsToString(0xFF), ".");
+		return string.concat(" Roles available are: ", roleBitsToString(0xFF), ".");
 	}
 
 	/// @notice Returns a human-legible list of roles which have permission to call the given
@@ -405,7 +404,7 @@ contract AutomatedAdmin {
 		bytes4 functionSig
 	) external view returns (string memory) {
 		return string.concat(
-			"\n> This function can be called by: ",
+			" This function can be called by: ",
 			roleBitsToString(permissions[_contract][functionSig]),
 			"."
 		);
@@ -416,17 +415,25 @@ contract AutomatedAdmin {
 	/// @param user The address of the user in question
 	/// @return list The list of roles
 	function getRolesUser(address user) external view returns (string memory list) {
-		list = "\n> User's roles are: ";
+		list = " User's roles are: ";
 		bytes1 _roles = roles[user] & slot0.roleMap;
 		bool anyRole = false;
 		for (uint i; i < 8;) {
 			if (_roles & 0x01 != 0) {
 				if (_roles >> 1 == 0) {
 					if (anyRole)
-						return string.concat(list, 'and "', roleNames[i], '".');
-					return string.concat("\n> User's role is: \"", roleNames[i], '".');
+						return string.concat(
+							list, 'and "', roleNames[i],
+							'" [', roleToIndexString(uint8(i)), "]."
+						);
+					return string.concat(
+						" User's role is: \"", roleNames[i],
+						'" [', roleToIndexString(uint8(i)), "]."
+					);
 				}
-				list = string.concat(list, '"', roleNames[i], '", ');
+				list = string.concat(
+					list, '"', roleNames[i], '" [', roleToIndexString(uint8(i)), "], "
+				);
 				anyRole = true;
 			}
 			_roles >>= 1;
@@ -448,11 +455,13 @@ contract AutomatedAdmin {
 		_roles >>= 1;
 		list = "the ";
 		bool _onlyAdmin = true;
-		string memory thisRole = "Admin";
+		string memory thisRole = '"Admin" [0]';
 		for (uint i = 1; i < 8;) {
 			if (_roles & 0x01 != 0) {
-				list = string.concat(list, '"', thisRole, '", ');
-				thisRole = roleNames[i];
+				list = string.concat(list, thisRole, ", ");
+				thisRole = string.concat(
+					'"', roleNames[i], '" [', roleToIndexString(uint8(i)), "]"
+				);
 				_onlyAdmin = false;
 			}
 			_roles >>= 1;
@@ -461,9 +470,9 @@ contract AutomatedAdmin {
 			}
 		}
 		if (_onlyAdmin) {
-			return 'the "Admin", and nobody else';
+			return 'the "Admin" [0], and nobody else';
 		}
-		list = string.concat(list, 'and "', thisRole, '"');
+		list = string.concat(list, 'and ', thisRole);
 	}
 
 	// Takes an array of role indices and generates a bitmap which can be compared
@@ -475,5 +484,12 @@ contract AutomatedAdmin {
 				++i;
 			}
 		}
+	}
+
+	// Should only be used in functions meant to be called off-chain
+	function roleToIndexString(uint8 role) private pure returns (string memory) {
+		bytes memory index = new bytes(1);
+		index[0] = bytes1(uint8(0x0030) + role);
+		return string(index);
 	}
 }
