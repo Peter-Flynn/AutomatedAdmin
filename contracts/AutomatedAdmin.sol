@@ -196,19 +196,20 @@ contract AutomatedAdmin {
 	}
 
 	/// @notice Removes the given user from the given role
-	/// @param user The user to removed from the role
+	/// @param user The user to be removed from the role
 	/// @param role The index of the role to remove the user from
 	function roleRemove(address user, Roles role) external canCall(ADMIN) {
-		Slot0 memory _slot0 = slot0;
 		if (role == Roles.Admin) {
+			Slot0 memory _slot0 = slot0;
 			if (_slot0.adminCount == 1)
 				revert CannotRemoveLastAdmin();
-			if (roles[user] & ADMIN != 0)
+			if (roles[user] & ADMIN != 0) {
 				_slot0.adminCount--;
+				slot0 = _slot0;
+			}
 		}
-		roles[user] ^= bytes1(0x01) << uint(role);
-		slot0 = _slot0;
-		emit RoleAdd(msg.sender, user, role);
+		roles[user] &= ~(bytes1(0x01) << uint(role));
+		emit RoleRemove(msg.sender, user, role);
 	}
 
 	/// @notice Enables, and names a new role
@@ -231,7 +232,7 @@ contract AutomatedAdmin {
 		if (uint8(role) < 3)
 			revert PermanentRole();
 		delete roleNames[uint(role)];
-		slot0.roleMap ^= bytes1(0x01) << uint(role);
+		slot0.roleMap &= ~(bytes1(0x01) << uint(role));
 		emit RoleDestroy(msg.sender, role);
 	}
 
